@@ -2,7 +2,9 @@ import os
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
+from unittest.mock import patch
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QAbstractItemView
@@ -55,6 +57,50 @@ class StockMovementHistoryTests(unittest.TestCase):
             self.assertEqual(movement.stock_after, after)
             self.assertEqual(movement.detail, detail)
         self.assertTrue(all(m.id for m in movements))
+
+    def test_movement_clock_orders_same_physical_timestamp(self):
+        fixed_now = datetime(2026, 9, 16, 16, 0, tzinfo=timezone.utc)
+        with self.db._connect() as connection:
+            self.assertIsNone(
+                connection.execute(
+                    "SELECT value FROM app_settings WHERE key = 'movement_clock'"
+                ).fetchone()
+            )
+        with patch("novarix_stock.database.datetime") as clock:
+            clock.now.return_value = fixed_now
+            clock.fromisoformat.side_effect = datetime.fromisoformat
+            self._run_mov_001()
+
+        movements = query_stock_movements(self.db)
+        self.assertEqual(
+            [movement.movement_type for movement in movements],
+            ["ANULACIÓN DE VENTA", "AJUSTE", "VENTA", "ENTRADA"],
+        )
+        timestamps = [movement.timestamp for movement in movements]
+        self.assertEqual(len(timestamps), len(set(timestamps)))
+        self.assertEqual(
+            [timestamp.microsecond for timestamp in timestamps], [3, 2, 1, 0]
+        )
+        with self.db._connect() as connection:
+            clock_value = connection.execute(
+                "SELECT value FROM app_settings WHERE key = 'movement_clock'"
+            ).fetchone()["value"]
+        self.assertEqual(clock_value, "2026-09-16T16:00:00.000003+00:00")
+
+    def test_existing_movement_timestamp_is_not_modified(self):
+        self.db.register_entry(self.product.id, 1)
+        with self.db._connect() as connection:
+            original = connection.execute(
+                "SELECT entry_at FROM stock_entries"
+            ).fetchone()["entry_at"]
+
+        self.db.register_sale(self.product.id, 1)
+
+        with self.db._connect() as connection:
+            preserved = connection.execute(
+                "SELECT entry_at FROM stock_entries"
+            ).fetchone()["entry_at"]
+        self.assertEqual(preserved, original)
 
     def test_filter_by_type(self):
         self._run_mov_001()

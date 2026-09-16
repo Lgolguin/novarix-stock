@@ -92,6 +92,10 @@ class BackupCoreTests(unittest.TestCase):
         return {"p1": product1, "p2": product2}, {"photo1": photo1, "photo2": photo2}
 
     def _snapshot(self) -> dict:
+        with self.database._connect() as connection:
+            movement_clock = connection.execute(
+                "SELECT value FROM app_settings WHERE key = 'movement_clock'"
+            ).fetchone()["value"]
         return {
             "products": self.database.list_products(),
             "sales": self.database.list_sales(),
@@ -100,6 +104,7 @@ class BackupCoreTests(unittest.TestCase):
             "cancellations": self.database.list_sale_cancellations(),
             "financials": self.database.get_financial_summary(),
             "movements": query_stock_movements(self.database),
+            "movement_clock": movement_clock,
             "plan": self.database.get_plan(),
             "images": sorted(
                 [
@@ -175,6 +180,7 @@ class BackupCoreTests(unittest.TestCase):
         self.assertEqual(restored["adjustments"], original["adjustments"])
         self.assertEqual(restored["cancellations"], original["cancellations"])
         self.assertEqual(restored["financials"], original["financials"])
+        self.assertEqual(restored["movement_clock"], original["movement_clock"])
         self.assertEqual(
             [m.movement_type for m in restored["movements"]],
             [m.movement_type for m in original["movements"]],

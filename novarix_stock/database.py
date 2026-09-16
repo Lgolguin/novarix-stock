@@ -4,7 +4,7 @@ import re
 import sqlite3
 from contextlib import contextmanager
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterator
 
@@ -49,10 +49,27 @@ class StockDatabase:
         self.database_path.parent.mkdir(parents=True, exist_ok=True)
         self._create_schema()
 
-    @staticmethod
-    def _now_iso() -> str:
-        """High-resolution UTC timestamp for stable chronological ordering."""
-        return datetime.now(timezone.utc).isoformat()
+    def _next_movement_timestamp(self, connection: sqlite3.Connection) -> str:
+        """Return a persistently monotonic UTC timestamp for stock movements."""
+        row = connection.execute(
+            "SELECT value FROM app_settings WHERE key = 'movement_clock'"
+        ).fetchone()
+        current = datetime.now(timezone.utc)
+        previous = self._text_to_datetime(row["value"]) if row else None
+        timestamp = (
+            current
+            if previous is None or current > previous
+            else previous + timedelta(microseconds=1)
+        )
+        value = timestamp.isoformat()
+        connection.execute(
+            """
+            INSERT INTO app_settings (key, value) VALUES ('movement_clock', ?)
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value
+            """,
+            (value,),
+        )
+        return value
 
     @contextmanager
     def _connect(self) -> Iterator[sqlite3.Connection]:
@@ -399,7 +416,7 @@ class StockDatabase:
                     "INSERT INTO sale_cancellations "
                     "(sale_id, quantity, invoiced_cents, cost_cents, profit_cents, reason, stock_returned, stock_before, stock_after, cancelled_at) "
                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    (sale_id, quantity, invoiced, cost, invoiced - cost, reason.strip(), int(product is not None), stock_before, stock_after, self._now_iso()),
+                    (sale_id, quantity, invoiced, cost, invoiced - cost, reason.strip(), int(product is not None), stock_before, stock_after, self._next_movement_timestamp(connection)),
                 )
         except (sqlite3.Error, OverflowError) as error:
             raise StockError("No se pudo anular la venta.") from error
@@ -615,7 +632,7 @@ class StockDatabase:
                     "(product_id, product_sku, product_name, stock_before, stock_after, difference, adjusted_at) "
                     "VALUES (?, ?, ?, ?, ?, ?, ?)",
                     (product_id, product["sku"], product["name"], product["stock_current"],
-                     new_stock, new_stock - int(product["stock_current"]), self._now_iso()),
+                     new_stock, new_stock - int(product["stock_current"]), self._next_movement_timestamp(connection)),
                 )
         except sqlite3.Error as error:
             raise StockError("No se pudo guardar el ajuste de stock.") from error
@@ -708,7 +725,7 @@ class StockDatabase:
                         quantity,
                         stock_before,
                         stock_after,
-                        self._now_iso(),
+                        self._next_movement_timestamp(connection),
                     ),
                 )
         except sqlite3.DatabaseError as error:
@@ -767,7 +784,7 @@ class StockDatabase:
                         int(product["sale_price_cents"]),
                         available,
                         available - quantity,
-                        self._now_iso(),
+                        self._next_movement_timestamp(connection),
                     ),
                 )
         except sqlite3.DatabaseError as error:
