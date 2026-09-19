@@ -927,4 +927,4 @@ class MainWindow(QMainWindow):
         if controller is not None:
             controller.unlock()
         else:
-            QMessageBox.information(self, "STOCK Pro", "La conexión de STOCK Pro TEST no está configurada.")
+            QMessageBox.information(self, "STOCK Pro", "STOCK Pro no está disponible en este momento. Escribinos a soporte.")

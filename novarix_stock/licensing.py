@@ -66,6 +66,11 @@ def safe_checkout(url):
         raise LicenseError('La direcciÃ³n de checkout recibida no es segura.') from None
 
 
+# Public production defaults: installed PCs have no env vars; this key only verifies signatures.
+DEFAULT_LICENSE_API_URL = 'https://novarix-stock.onrender.com'
+DEFAULT_LICENSE_PUBLIC_KEY = 'xy/feL1HA8xZxoYaybUYjC+Vb3DW51TyJPcfdZM2YTg='
+
+
 class LicenseClient:
     def __init__(self, store, base_url='', public_key='', transport=None, clock=None):
         self.store = store
@@ -84,11 +89,11 @@ class LicenseClient:
     def from_env(cls, path):
         store = InstallationStore(path)
         try:
-            return cls(store, os.getenv('STOCK_LICENSE_API_URL', ''),
-                       os.getenv('STOCK_LICENSE_PUBLIC_KEY', ''))
+            return cls(store, os.getenv('STOCK_LICENSE_API_URL', '') or DEFAULT_LICENSE_API_URL,
+                       os.getenv('STOCK_LICENSE_PUBLIC_KEY', '') or DEFAULT_LICENSE_PUBLIC_KEY)
         except LicenseError as error:
             # A bad backend URL must not prevent inventory access or discard a signed cache.
-            result = cls(store, public_key=os.getenv('STOCK_LICENSE_PUBLIC_KEY', ''))
+            result = cls(store, public_key=os.getenv('STOCK_LICENSE_PUBLIC_KEY', '') or DEFAULT_LICENSE_PUBLIC_KEY)
             result.config_error = str(error)
             return result
 
@@ -96,7 +101,7 @@ class LicenseClient:
         if self.config_error:
             raise LicenseError(self.config_error)
         if not self.base_url or not self.public_key:
-            raise LicenseError('STOCK Pro TEST todavÃ­a no estÃ¡ configurado. ConsultÃ¡ la guÃ­a de la etapa 8.')
+            raise LicenseError('STOCK Pro no está disponible en este momento. Escribinos a soporte.')
         identity = self.store.read()
         try:
             with httpx.Client(base_url=self.base_url, timeout=httpx.Timeout(20, connect=3),

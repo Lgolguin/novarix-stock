@@ -60,7 +60,7 @@ class UiSmokeTests(unittest.TestCase):
                 info.assert_called_once()
                 self.assertEqual(
                     info.call_args.args[2],
-                    "La conexión de STOCK Pro TEST no está configurada.",
+                    "STOCK Pro no está disponible en este momento. Escribinos a soporte.",
                 )
             self.assertEqual(database.get_plan(), AppPlan.FREE)
             window.close()
