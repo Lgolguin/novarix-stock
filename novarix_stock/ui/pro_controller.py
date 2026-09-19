@@ -1,6 +1,5 @@
 """Small asynchronous bridge between the existing window and the license service."""
 import time
-from decimal import Decimal
 
 from PySide6.QtCore import QObject, QRunnable, QThreadPool, QTimer, QUrl, Qt, Signal, Slot
 from PySide6.QtGui import QDesktopServices
@@ -101,7 +100,6 @@ class ProController(QObject):
         if error:
             QMessageBox.information(self.window, 'STOCK Pro', error)
             return
-        amount = f"{Decimal(offer['monthly_amount']):,.2f}".replace(',', '_').replace('.', ',').replace('_', '.')
         test_mode = offer.get('mode') == 'test'
         if test_mode:
             intro = 'MODO TEST ? Solo cuentas y tarjetas de prueba.\n\n'
@@ -112,7 +110,7 @@ class ProController(QObject):
         answer = QMessageBox.question(
             self.window,
             'STOCK PRO — $49.999 ARS / mes',
-            intro + f'Monto mensual configurado: ARS $ {amount}.\n'
+            intro + 'STOCK PRO — Suscripción mensual: $49.999\n'
             + 'El pago se completa en Mercado Pago. ' + question,
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,

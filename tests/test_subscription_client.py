@@ -206,8 +206,7 @@ class SubscriptionClientTests(unittest.TestCase):
             with patch('novarix_stock.ui.pro_controller.QMessageBox.question', return_value=QMessageBox.StandardButton.Yes) as question, patch('novarix_stock.ui.pro_controller.QDesktopServices.openUrl', return_value=True) as browser:
                 window.pro_button.click()
                 drain()
-                self.assertIn('49.999,00', question.call_args.args[2])
-                self.assertIn('ARS', question.call_args.args[2])
+                self.assertIn('STOCK PRO — Suscripción mensual: $49.999', question.call_args.args[2])
                 self.assertEqual(question.call_args.args[1], 'STOCK PRO — $49.999 ARS / mes')
                 browser.assert_called_once()
             self.provider.sub['status'] = 'authorized'
